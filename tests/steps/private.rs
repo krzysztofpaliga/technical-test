@@ -1,37 +1,20 @@
 use std::{
     time::{SystemTime},
 };
-use std::fs::File;
-use std::io::Write;
 
-use cucumber::{given, then, when, World};
+use cucumber::{when, World};
 use hmac;
 use hmac::{Mac, NewMac};
-use reqwest::{Client};
-use reqwest::header::{HeaderMap, HeaderValue};
-use serde_json::{Value};
-use serde_json;
+use reqwest::header::{HeaderValue};
 use sha2::{Digest, Sha256, Sha512};
 
-
-
-#[given("I am about to make a request to Kraken Private API")]
-async fn prepare_private_request(w: &mut APIWorld) {
-    w.request_url = "https://api.kraken.com".to_string();
-    w.request_path = "/0/private".to_string();
-
-    w.http_client = Client::new();
-
-    w.request_headers = HeaderMap::new();
-    w.request_headers.insert("Content-Type", HeaderValue::from_static("application/json"));
-    w.request_headers.insert("Accept", HeaderValue::from_static("application/json"));
-}
-
+mod common;
+use common::APIWorld;
 
 #[when("I retrieve open orders")]
 async fn retrieve_open_orders(w: &mut APIWorld) {
     w.request_path.push_str("/OpenOrders");
-    // Normally, keys woudl be read from .env file
+    // Normally, keys would be read from .env file
     // For simplicity hardcoded
     let api_key = "jkQX5vKHdHOZY3EMmenbZOl/EBTyWO/h/hDVEZ2siScgSgw3ay8uSPBG";
     let private_key = "EUpz3x/N65jf3AxaSQ7rga5DXMbLYu4ClQvMlmiGe5p/4etXY23TqzuwCR6iQKtShFu1XdfUCuK718+GXHQmQQ==";
@@ -80,22 +63,6 @@ async fn retrieve_open_orders(w: &mut APIWorld) {
             panic!("Request failed with error: {:?}", error);
         }
     }
-}
-
-#[then("I assert no error in response")]
-fn assert_response_error_free(w: &mut APIWorld) {
-    let json_value: Value = serde_json::from_str(w.response_body.as_ref().unwrap()).expect("Failed to parse JSON");
-
-    assert!(json_value["error"].is_array());
-    assert!(json_value["error"].as_array().unwrap().is_empty(), "Error field is not empty");
-}
-
-#[then("I report the result")]
-async fn report_result(w: &mut APIWorld) {
-    let response_body = w.response_body.as_ref().unwrap();
-    let mut file = File::create("kraken_private_api_response.json").expect("Unable to create file");
-    file.write_all(response_body.as_bytes()).expect("Unable to write data");
-
 }
 
 #[allow(dead_code)]

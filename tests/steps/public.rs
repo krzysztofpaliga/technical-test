@@ -1,35 +1,11 @@
-use std::collections::HashSet;
-use std::fs::File;
-use std::io::Write;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chrono::{DateTime};
-use cucumber::{given, then, when, World};
-use reqwest::{Client};
-use reqwest::header::{HeaderMap, HeaderValue};
+use cucumber::{then, when, World};
 use serde_json::Value;
 
-mod private;
-
-#[derive(cucumber::World, Debug, Default)]
-pub struct APIWorld {
-    http_client: Client,
-    request_url: String,
-    request_path: String,
-    request_headers: HeaderMap,
-    response_body: Option<String>,
-}
-
-#[given("I am about to make a request to Kraken Public API")]
-async fn prepare_public_request(w: &mut APIWorld) {
-    w.http_client = Client::new();
-
-    w.request_url = "https://api.kraken.com".to_string();
-    w.request_path = "/0/public".to_string();
-
-    w.request_headers = HeaderMap::new();
-    w.request_headers.insert("Accept", HeaderValue::from_static("application/json"));
-}
+mod common;
+use common::APIWorld;
 
 #[when("I retrieve the server time")]
 async fn retrieve_server_time(w: &mut APIWorld) {
@@ -62,15 +38,8 @@ async fn retrieve_traiding_pair(w: &mut APIWorld, base:String, quote:String) {
     }
 }
 
-#[then("I report the result")]
-async fn report_result(w: &mut APIWorld) {
-    let response_body = w.response_body.as_ref().unwrap();
-    let mut file = File::create("kraken_api_response.json").expect("Unable to create file");
-    file.write_all(response_body.as_bytes()).expect("Unable to write data");
-}
-
 #[then("Unixtime is equal to current time")]
-fn assert_current_time(w: &mut APIWorld) {
+async fn assert_current_time(w: &mut APIWorld) {
     let response_body = w.response_body.as_ref().unwrap();
     let response_json: Value = serde_json::from_str(response_body).unwrap();
     let server_unixtime = response_json["result"]["unixtime"].as_i64().unwrap();
@@ -82,7 +51,7 @@ fn assert_current_time(w: &mut APIWorld) {
 }
 
 #[then("Unixtime is equal to RFC1123 time")]
-fn assert_server_time(w: &mut APIWorld) {
+async fn assert_server_time(w: &mut APIWorld) {
     let response_body = w.response_body.as_ref().unwrap();
     let response_json: Value = serde_json::from_str(response_body).unwrap();
     let server_unixtime = response_json["result"]["unixtime"].as_i64().unwrap();
@@ -95,28 +64,10 @@ fn assert_server_time(w: &mut APIWorld) {
 }
 
 
-#[then(expr = "Result has to expected format for {word}-{word}")]
-fn assert_same_fields(w: &mut APIWorld, base: String, quote:String) {
-    let response_body = w.response_body.as_ref().unwrap();
-    let response_json: Value = serde_json::from_str(response_body).unwrap();
-    let server_data = &response_json["result"][format!("X{}Z{}",base, quote)];
 
-    let file = File::open(format!("./assets/{}{}.json", base, quote)).expect("Unable to open file");
-    let file_json: Value = serde_json::from_reader(file).expect("Unable to parse JSON from file");
-    let file_data = &file_json["result"][format!("X{}Z{}",base, quote)];
-
-    assert_json_fields(&server_data, &file_data);
-}
-
-fn assert_json_fields(server_data: &Value, file_data: &Value) {
-    let server_keys: HashSet<_> = server_data.as_object().unwrap().keys().collect();
-    let file_keys: HashSet<_> = file_data.as_object().unwrap().keys().collect();
-
-    assert_eq!(server_keys, file_keys, "The fields in the JSON response do not match the fields in the file");
-}
 #[allow(dead_code)]
 #[tokio::main]
 async fn main() {
-    APIWorld::run("./tests/features/public.feature").await;
+    APIWorld::cucumber().run_and_exit("./tests/features/public.feature").await;
 }
 

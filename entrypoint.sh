@@ -7,5 +7,5 @@ echo "\n##############################\n"
 
 cargo test --test public
 echo "\n##### Traiding Pair Raport #####\n"
-cat kraken_api_response.json
+cat kraken_public_api_response.json
 echo "\n##############################\n"
